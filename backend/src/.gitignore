@@ -1,0 +1,11 @@
+# Executables
+*.exe
+
+# Editor files
+.vscode/
+
+# Build outputs
+.pio/
+build/
+node_modules/
+.env
