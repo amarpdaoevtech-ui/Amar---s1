@@ -18,22 +18,35 @@ The platform addresses the challenge of monitoring distributed EV fleets where o
 - **Fleet-Scale Simulator**: Configurable simulator supporting 50-100+ concurrent vehicles with realistic scenario modeling
 - **Operations Log**: Historical telemetry grouped by minute for operational audit trails
 - **Asset Registry**: Searchable, filterable vehicle list optimized for large fleets using React performance patterns
+- **Enhanced Alert Visualization Dashboard**: Converts alert noise into operational insights with 4 key charts (Alert Volume Trends, Fleet Health Distribution, Top Alerting Vehicles, Alert Resolution Metrics)
+- **Vehicle-Specific Alert Panels**: Contextual alert visibility eliminating global alert spam with grouping by alert type
+- **System Health Summary**: Aggregated fleet health view showing critical/warning/healthy vehicle counts
+- **Non-Intrusive Alert Indicators**: Human factors compliant alert presentation reducing operator fatigue
+- **Real-Time Battery Health Computation**: Dynamic SOC-based health indicators with color-coded status
+- **WebSocket Subscription Management**: Efficient real-time data delivery with "all" vehicle subscriptions
+- **Advanced Telemetry Data Fetching**: Automatic current telemetry retrieval on dashboard initialization
+- **Alert Acknowledgment Workflow**: End-to-end alert acknowledgment with WebSocket synchronization and visual feedback
+- **Performance Optimized Queries**: Database query optimization preventing timeouts and improving response times
+- **Enhanced Simulator Stability**: Improved timeout handling, circuit breaker patterns, and reduced load configurations
+- **Aggregated Alert Views**: System state visualization replacing raw alert feeds for better situational awareness
 
 ## System Architecture
 
 The platform follows a clean, layered architecture with clear separation between components:
 
-**Simulator Layer**: Independent Node.js process that simulates multiple EVs. Each vehicle instance maintains internal state (battery, speed, temperature) and sends telemetry via HTTP POST every 2 seconds with jitter to prevent traffic bursts. The simulator authenticates only for vehicle registration; telemetry ingestion remains public to simulate real vehicle behavior.
+**Simulator Layer**: Independent Node.js process that simulates multiple EVs. Each vehicle instance maintains internal state (battery, speed, temperature) and sends telemetry via HTTP POST every 1-2 seconds with jitter to prevent traffic bursts. The simulator authenticates only for vehicle registration; telemetry ingestion remains public to simulate real vehicle behavior. Enhanced with improved timeout handling, circuit breaker patterns, and optimized retry logic.
 
-**Backend Layer**: Express.js server organized into Routes → Controllers → Services → Database layers. The backend exposes RESTful APIs for vehicle management, telemetry history, alerts, and authentication. It processes incoming telemetry, applies alert rules, and stores data in PostgreSQL. The controller layer handles HTTP concerns while the service layer contains business logic.
+**Backend Layer**: Express.js server organized into Routes → Controllers → Services → Database layers. The backend exposes RESTful APIs for vehicle management, telemetry history, alerts, and authentication. It processes incoming telemetry, applies alert rules, and stores data in PostgreSQL. The controller layer handles HTTP concerns while the service layer contains business logic. Enhanced with alert state management, optimized database queries, and improved WebSocket broadcasting.
 
-**Real-Time Layer**: Socket.io manages WebSocket connections between backend and dashboard. When telemetry arrives, the backend broadcasts updates to subscribed clients with throttling (2 updates/sec per vehicle) to prevent overwhelming the UI. Alerts bypass throttling for immediate delivery. Clients subscribe to specific vehicle streams or "all" for fleet-wide monitoring.
+**Real-Time Layer**: Socket.io manages WebSocket connections between backend and dashboard. When telemetry arrives, the backend broadcasts updates to subscribed clients with throttling (2 updates/sec per vehicle) to prevent overwhelming the UI. Alerts bypass throttling for immediate delivery. Clients subscribe to specific vehicle streams or "all" for fleet-wide monitoring. Enhanced with improved subscription management and real-time synchronization.
 
-**Database Layer**: PostgreSQL stores vehicles, telemetry (with JSONB data column), and alerts. Telemetry uses indexed timestamps for efficient time-range queries. Alert deduplication logic uses status tracking (active/resolved) with alert_type + vehicle_id uniqueness constraints.
+**Database Layer**: PostgreSQL stores vehicles, telemetry (with JSONB data column), and alerts. Telemetry uses indexed timestamps for efficient time-range queries. Alert deduplication logic uses status tracking (active/resolved) with alert_type + vehicle_id uniqueness constraints. Enhanced with optimized queries and performance improvements.
 
-**Frontend Layer**: React dashboard built with Vite, consuming REST APIs on mount and switching to WebSocket subscriptions for live updates. The UI uses React.memo and useMemo to prevent unnecessary re-renders when managing 50+ vehicles. Charts are powered by Recharts, and real-time data updates trigger smooth state transitions via Framer Motion.
+**Frontend Layer**: React dashboard built with Vite, consuming REST APIs on mount and switching to WebSocket subscriptions for live updates. The UI uses React.memo and useMemo to prevent unnecessary re-renders when managing 50+ vehicles. Charts are powered by Recharts, and real-time data updates trigger smooth state transitions via Framer Motion. Enhanced with alert visualization dashboard, vehicle-specific alert panels, system health summaries, and improved telemetry data fetching.
 
-**Data Flow**: Vehicle telemetry → Backend REST API → PostgreSQL storage → Alert engine evaluation → WebSocket broadcast → Dashboard state update → UI re-render. This unidirectional flow ensures data consistency and predictable state management.
+**Alert Management Layer**: Advanced alert state management system with deduplication caching, auto-resolution logic, and real-time acknowledgment workflow. Provides aggregated fleet health views and converts alert noise into operational insights through data visualization.
+
+**Data Flow**: Vehicle telemetry → Backend REST API → PostgreSQL storage → Alert engine evaluation → WebSocket broadcast → Dashboard state update → UI re-render. This unidirectional flow ensures data consistency and predictable state management. Enhanced with improved telemetry data fetching on initialization and real-time WebSocket synchronization.
 
 ## Tech Stack
 
@@ -63,6 +76,14 @@ The platform follows a clean, layered architecture with clear separation between
 - Git (version control)
 - npm (package management)
 
+**Enhanced Components**
+- Alert State Manager (custom service for alert deduplication and caching)
+- WebSocket Subscription Manager (improved real-time data delivery)
+- Telemetry Data Fetcher (automatic current telemetry retrieval)
+- Alert Visualization Dashboard (data insights conversion)
+- Vehicle-Specific Alert Panels (contextual alert grouping)
+- System Health Summary (aggregated fleet state views)
+
 ## Folder Structure
 
 ```
@@ -71,9 +92,18 @@ Amar-s1/
 │   ├── src/
 │   │   ├── controllers/       # HTTP request handlers
 │   │   ├── services/          # Business logic layer
+│   │   │   ├── alert.api.service.js    # Alert CRUD operations
+│   │   │   ├── alert.state.manager.js  # Alert deduplication and caching (NEW)
+│   │   │   ├── realtime.service.js     # Real-time status tracking
+│   │   │   ├── telemetry.service.js    # Telemetry processing and storage
+│   │   │   └── vehicle.service.js      # Vehicle management
 │   │   ├── routes/            # API endpoint definitions
 │   │   ├── middleware/        # Auth, validation, error handling
 │   │   ├── utils/             # Helper functions
+│   │   ├── websocket/         # WebSocket server components
+│   │   │   ├── broadcaster.js        # Event broadcasting with throttling
+│   │   │   ├── index.js              # WebSocket server initialization
+│   │   │   └── subscriptions.js      # Client subscription management
 │   │   ├── db.js              # PostgreSQL connection
 │   │   ├── server.js          # Express app entry point
 │   │   └── socketServer.js    # WebSocket server
@@ -84,16 +114,26 @@ Amar-s1/
 ├── frontend/
 │   ├── src/
 │   │   ├── components/        # React components
-│   │   │   ├── Dashboard.jsx      # Main container
-│   │   │   ├── Login.jsx          # Authentication UI
-│   │   │   ├── VehicleCard.jsx    # Live telemetry cards
-│   │   │   ├── AlertPanel.jsx     # Real-time alert feed
-│   │   │   ├── TelemetryChart.jsx # Time-series visualization
-│   │   │   ├── AssetList.jsx      # Vehicle registry
-│   │   │   ├── VehicleHistory.jsx # Operations log
-│   │   │   └── VehicleManagement.jsx # CRUD interface
+│   │   │   ├── Dashboard.jsx           # Main container with enhanced data fetching
+│   │   │   ├── Login.jsx               # Authentication UI
+│   │   │   ├── VehicleCard.jsx         # Live telemetry cards with battery health
+│   │   │   ├── AssetList.jsx           # Vehicle registry with performance optimizations
+│   │   │   ├── AlertPanel.jsx          # Real-time alert feed with acknowledgment
+│   │   │   ├── EnhancedVehicleAlertPanel.jsx  # Vehicle-specific alerts (NEW)
+│   │   │   ├── VehicleAlertPanel.jsx   # Contextual alert grouping (NEW)
+│   │   │   ├── AlertVisualizationDashboard.jsx  # Data insights dashboard (NEW)
+│   │   │   ├── FleetHealthSummary.jsx  # Aggregated fleet health view (NEW)
+│   │   │   ├── NonIntrusiveAlertIndicator.jsx  # Human factors alert display (NEW)
+│   │   │   ├── Charts.jsx              # Time-series visualization
+│   │   │   ├── VehicleHistory.jsx      # Operations log
+│   │   │   └── VehicleManagement.jsx   # CRUD interface
 │   │   ├── hooks/             # Custom React hooks
 │   │   │   └── useVehicles.js     # Vehicle CRUD logic
+│   │   ├── services/          # Frontend services
+│   │   │   └── socket.js             # WebSocket client connection
+│   │   ├── utils/             # Helper functions
+│   │   │   ├── formatters.js         # Data formatting utilities
+│   │   │   └── ui-utils.js           # UI helper functions
 │   │   ├── App.jsx            # Root component with routing
 │   │   ├── index.css          # Tailwind imports
 │   │   └── main.jsx           # React entry point
@@ -101,7 +141,7 @@ Amar-s1/
 │   └── vite.config.js         # Vite configuration
 │
 ├── simulator/
-│   ├── simulator.js           # Fleet simulator
+│   ├── simulator.js           # Fleet simulator with enhanced stability
 │   └── package.json
 │
 └── README.md
@@ -295,6 +335,39 @@ Open a **third terminal window** to run the vehicle simulator:
    Press `Ctrl+C` in the simulator terminal for graceful shutdown.
 
 **Default Behavior**: The simulator registers 50 vehicles and begins sending telemetry every 2 seconds. Vehicles are distributed across scenarios: 60% normal operation, 20% low battery, 10% overheating, and 10% mixed anomalies.
+
+## Recent Enhancements
+
+### Alert Management System Improvements
+- **Alert State Manager**: Implemented advanced alert deduplication with in-memory caching to prevent notification spam
+- **Real-time Acknowledgment**: Added end-to-end alert acknowledgment workflow with WebSocket synchronization
+- **Visual Feedback**: Enhanced alert panels with acknowledgment indicators and status displays
+- **Auto-Resolution Logic**: Improved automatic alert resolution when conditions normalize
+
+### Dashboard UX Redesign
+- **Aggregated Views**: Replaced raw alert feeds with system state visualization for better situational awareness
+- **Vehicle-Specific Alerts**: Eliminated global alert spam by implementing contextual alert panels
+- **Data Visualization**: Added comprehensive alert visualization dashboard converting noise to insights
+- **Health Summaries**: Created fleet health overview panels showing critical/warning/healthy distributions
+- **Non-Intrusive Design**: Implemented human factors compliant alert presentation reducing operator fatigue
+
+### Performance Optimizations
+- **Database Query Optimization**: Fixed timeout issues with simplified telemetry stats queries
+- **WebSocket Subscription**: Added automatic "all" vehicle subscriptions for efficient real-time updates
+- **Telemetry Data Fetching**: Implemented automatic current telemetry retrieval on dashboard initialization
+- **Simulator Stability**: Enhanced timeout handling, circuit breaker patterns, and retry logic
+
+### Real-time Features
+- **Battery Health Computation**: Added dynamic SOC-based health indicators with real-time updates
+- **WebSocket Synchronization**: Improved real-time data delivery with proper state management
+- **Alert Correlation**: Enhanced charts with alert reference lines for better data correlation
+- **Status Tracking**: Implemented vehicle online/offline status with automatic detection
+
+### System Architecture Enhancements
+- **Layered Alert Management**: Added dedicated alert state management layer with caching and deduplication
+- **Improved Data Flow**: Enhanced telemetry data flow from database to UI with proper initialization
+- **Scalability Improvements**: Optimized system for handling high-volume alert scenarios
+- **Error Handling**: Added robust error handling and graceful degradation patterns
 
 ## Day-wise Implementation Breakdown
 
@@ -900,5 +973,7 @@ Key skills demonstrated include:
 - **Frontend Development**: React state management, real-time UI updates, performance optimization, responsive design
 - **System Design**: Clean architecture, separation of concerns, scalability planning, fault tolerance
 - **DevOps Practices**: Environment configuration, multi-process orchestration, graceful shutdown handling
+- **UX/UI Design**: Human factors engineering, alert fatigue prevention, data visualization, contextual interfaces
+- **Performance Optimization**: Database query optimization, real-time data fetching, WebSocket efficiency, caching strategies
 
-This project reflects the type of system used in production environments for IoT monitoring, logistics tracking, and industrial automation. The scalable architecture, comprehensive feature set, and attention to real-world constraints make it a strong demonstration of software engineering capabilities suitable for technical evaluation and professional discussion.
+This enhanced platform now includes advanced alert management, sophisticated data visualization, human factors compliant UI design, and robust real-time synchronization. The system demonstrates enterprise-grade capabilities suitable for technical evaluation and professional discussion, reflecting modern software engineering practices and real-world operational requirements.
