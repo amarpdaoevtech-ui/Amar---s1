@@ -11,8 +11,11 @@ const AlertPanel = ({ alerts, onAlertAck, onCorrelate, isAdmin }) => {
   const handleAcknowledge = async (id) => {
     setAcking(id);
     try {
-      await axios.post(`/api/v1/alerts/${id}/acknowledge`);
-      onAlertAck(id);
+      const response = await axios.post(`/api/v1/alerts/${id}/acknowledge`);
+      // Only update local state on successful acknowledgment
+      if (response.data.status === 'success') {
+        onAlertAck(id);
+      }
     } catch (error) {
       console.error('Failed to acknowledge alert:', error);
       alert('Failed to acknowledge alert. Please try again.');
@@ -57,26 +60,42 @@ const AlertPanel = ({ alerts, onAlertAck, onCorrelate, isAdmin }) => {
               <div className="flex items-start gap-3">
                 <div className={cn(
                   "p-2 rounded-md",
-                  alert.severity === 'CRITICAL' ? "bg-red-500/20 text-red-400" : "bg-amber-500/20 text-amber-400"
+                  alert.acknowledged_at 
+                    ? "bg-slate-700/30 text-slate-500" 
+                    : (alert.severity === 'CRITICAL' ? "bg-red-500/20 text-red-400" : "bg-amber-500/20 text-amber-400")
                 )}>
                   {getIcon(alert.severity)}
                 </div>
                 <div>
                   <div className="flex items-center gap-2">
-                    <span className="text-[10px] font-black uppercase tracking-tighter text-white">
+                    <span className={cn(
+                      "text-[10px] font-black uppercase tracking-tighter",
+                      alert.acknowledged_at ? "text-slate-500" : "text-white"
+                    )}>
                       {alert.vehicle_id}
                     </span>
-                    <span className="text-[10px] font-mono text-slate-500">
+                    <span className={cn(
+                      "text-[10px] font-mono",
+                      alert.acknowledged_at ? "text-slate-600" : "text-slate-500"
+                    )}>
                       {formatRelativeTime(alert.created_at)}
                     </span>
+                    {alert.acknowledged_at && (
+                      <span className="text-[9px] font-mono text-slate-500 bg-slate-800/30 px-1.5 py-0.5 rounded">
+                        ACKNOWLEDGED
+                      </span>
+                    )}
                   </div>
-                  <p className="text-xs text-slate-300 mt-0.5 leading-tight line-clamp-1 group-hover:line-clamp-none transition-all">
+                  <p className={cn(
+                    "text-xs mt-0.5 leading-tight line-clamp-1 group-hover:line-clamp-none transition-all",
+                    alert.acknowledged_at ? "text-slate-500" : "text-slate-300"
+                  )}>
                     {alert.message}
                   </p>
                 </div>
               </div>
 
-              {isAdmin && (
+              {isAdmin && !alert.acknowledged_at && (
                 <button 
                   disabled={acking === alert.alert_id}
                   onClick={(e) => {
